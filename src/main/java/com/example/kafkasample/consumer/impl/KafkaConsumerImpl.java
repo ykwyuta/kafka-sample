@@ -12,6 +12,13 @@ import com.example.kafkasample.consumer.KafkaConsumer;
 import com.example.kafkasample.service.KafkaConsumerService;
 import org.springframework.kafka.support.Acknowledgment;
 
+/**
+ * Implementation of KafkaConsumer.
+ * <p>
+ * Kafkaトピックからメッセージをバッチで受信し、処理を行います。
+ * 手動でのAcknowledgment（確認応答）をサポートしています。
+ * </p>
+ */
 @Component
 public class KafkaConsumerImpl implements KafkaConsumer {
 
@@ -19,10 +26,28 @@ public class KafkaConsumerImpl implements KafkaConsumer {
 
     private final KafkaConsumerService kafkaConsumerService;
 
+    /**
+     * Constructor for KafkaConsumerImpl.
+     *
+     * @param kafkaConsumerService Service to delegate the processing of consumed
+     *                             messages
+     */
     public KafkaConsumerImpl(KafkaConsumerService kafkaConsumerService) {
         this.kafkaConsumerService = kafkaConsumerService;
     }
 
+    /**
+     * Listens to the "user" topic and processes messages in batches.
+     * <p>
+     * KafkaListenerとして動作し、"user"トピックからメッセージを受信します。
+     * 受信したメッセージリストを{@link KafkaConsumerService}に渡して処理し、
+     * 完了後にAcknowledgmentを実行してオフセットをコミットします。
+     * </p>
+     *
+     * @param users          List of User objects received from Kafka
+     * @param acknowledgment Acknowledgment object to manually commit the offset
+     */
+    @Override
     @KafkaListener(topics = "user", groupId = "order-processing-group")
     public void consume(List<User> users, Acknowledgment acknowledgment) {
         log.info("バッチ受信しました: {} 件", users.size());

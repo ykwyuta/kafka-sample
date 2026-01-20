@@ -10,6 +10,12 @@ import com.example.kafkasample.avro.User;
 import com.example.kafkasample.repository.UserRepository;
 import com.example.kafkasample.service.KafkaConsumerService;
 
+/**
+ * Implementation of KafkaConsumerService.
+ * <p>
+ * 受信したKafkaメッセージをデータベースに保存するサービス実装です。
+ * </p>
+ */
 @Service
 public class KafkaConsumerServiceImpl implements KafkaConsumerService {
 
@@ -17,10 +23,23 @@ public class KafkaConsumerServiceImpl implements KafkaConsumerService {
 
     private final UserRepository userRepository;
 
+    /**
+     * Constructor for KafkaConsumerServiceImpl.
+     *
+     * @param userRepository Repository for saving User data
+     */
     public KafkaConsumerServiceImpl(UserRepository userRepository) {
         this.userRepository = userRepository;
     }
 
+    /**
+     * Processes a list of User objects by saving them to the database.
+     * <p>
+     * 受信した各Userオブジェクトをログ出力し、{@link UserRepository}を使用して保存します。
+     * </p>
+     *
+     * @param users The list of User objects to process
+     */
     @Override
     public void process(List<User> users) {
         users.forEach(user -> {

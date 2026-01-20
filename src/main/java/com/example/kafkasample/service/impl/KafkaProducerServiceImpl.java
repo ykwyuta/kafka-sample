@@ -18,6 +18,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+/**
+ * Implementation of KafkaProducerService.
+ * <p>
+ * 定期的にメッセージを生成し、KafkaProducerを通じて送信するサービス実装です。
+ * </p>
+ */
 @Service
 public class KafkaProducerServiceImpl implements KafkaProducerService {
 
@@ -27,10 +33,23 @@ public class KafkaProducerServiceImpl implements KafkaProducerService {
 
     private final Instant stopTime = Instant.now().plus(Duration.ofMinutes(10));
 
+    /**
+     * Constructor for KafkaProducerServiceImpl.
+     *
+     * @param kafkaProducer Producer to send messages
+     */
     public KafkaProducerServiceImpl(KafkaProducer kafkaProducer) {
         this.kafkaProducer = kafkaProducer;
     }
 
+    /**
+     * Periodically sends messages to Kafka.
+     * <p>
+     * 10ミリ秒ごとに実行され、ランダムなデータを持つ20件のUserメッセージを生成して送信します。
+     * 全ての送信が完了するのを待機します。
+     * 起動から10分経過すると送信を停止します。
+     * </p>
+     */
     @Override
     @Scheduled(fixedRate = 10)
     public void sendMessage() {
@@ -52,6 +71,11 @@ public class KafkaProducerServiceImpl implements KafkaProducerService {
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
     }
 
+    /**
+     * Generates a random hex color string.
+     *
+     * @return A random color code in hex format (e.g., #a1b2c3)
+     */
     public String generateRandomHexColor() {
         RandomGenerator random = RandomGenerator.getDefault();
         // 0x000000 から 0xFFFFFF までの数値を生成
