@@ -1,6 +1,6 @@
 # Kafka Sample Project
 
-このプロジェクトは、Spring Bootを使用してApache Kafkaと連携するサンプルアプリケーションです。Avroスキーマを使用したメッセージのシリアライズ・デシリアライズ、プロデューサーによるメッセージ送信、およびコンシューマーによるメッセージ受信（リトライ機能、DLT処理付き）を実証しています。
+このプロジェクトは、Spring Bootを使用してApache Kafkaと連携するサンプルアプリケーションです。Avroスキーマを使用したメッセージのシリアライズ・デシリアライズ、プロデューサーによるバッチメッセージ送信、およびコンシューマーによるバッチ受信と手動確認（Acknowledgment）、H2データベースへの保存を実証しています。
 
 ## ディレクトリ構造
 
@@ -18,7 +18,7 @@ d:\workspace\kafkasample\
 │   │   │       ├── consumer\
 │   │   │       │   ├── KafkaConsumer.java     # コンシューマーのインターフェース
 │   │   │       │   └── impl\
-│   │   │       │       └── KafkaConsumerImpl.java # コンシューマーの実装 (受信ロジック)
+│   │   │       │       └── KafkaConsumerImpl.java # コンシューマーの実装 (バッチ受信・手動Ack)
 │   │   │       ├── producer\
 │   │   │       │   ├── KafkaProducer.java     # プロデューサーのインターフェース
 │   │   │       │   └── impl\
@@ -27,12 +27,14 @@ d:\workspace\kafkasample\
 │   │   │       │   ├── KafkaConsumerService.java
 │   │   │       │   ├── KafkaProducerService.java
 │   │   │       │   └── impl\
-│   │   │       │       ├── KafkaConsumerServiceImpl.java
+│   │   │       │       ├── KafkaConsumerServiceImpl.java # 受信データ処理（DB保存など）
 │   │   │       │       └── KafkaProducerServiceImpl.java # 定期実行される送信サービス
-│   │   │       ├── repository\                # (現在は空または未使用)
+│   │   │       ├── repository\
+│   │   │       │   ├── UserMapper.java        # MyBatis Mapper
+│   │   │       │   └── UserRepository.java    # データアクセスリポジトリ
 │   │   └── resources\
-│   │       └── application.properties         # Kafka接続設定など
-├── pom.xml                                    # Maven依存関係定義 (Avro, Kafka, Spring Boot)
+│   │       └── application.properties         # Kafka接続設定、DB設定など
+├── pom.xml                                    # Maven依存関係定義 (Avro, Kafka, MyBatis, H2)
 ├── docker-compose.yml                         # Kafka環境などのコンテナ構成定義
 └── HELP.md                                    # Spring Boot生成時のヘルプ
 ```
@@ -45,24 +47,31 @@ d:\workspace\kafkasample\
 ### 2. Consumer (`com.example.kafkasample.consumer`)
 *   **KafkaConsumer.java**: コンシューマー処理のインターフェース定義です。
 *   **KafkaConsumerImpl.java**: `KafkaConsumer` の実装クラスです。
-    *   `@KafkaListener`: "user" トピックを購読します。
-    *   受信したメッセージの処理は `KafkaConsumerService` に委譲します。
-    *   **Retry & DLT**: `@RetryableTopic` を使用して、エラー時のリトライ処理（3回試行、バックオフあり）と、最終的に失敗した場合の Dead Letter Topic (DLT) への転送処理 (`@DltHandler`) が実装されています。
+    *   `@KafkaListener`: Batch Listenerとして動作し、`List<User>` を受け取ります。
+    *   `Acknowledgment`: 手動でオフセットのコミット（Ack）を行います (`manual_immediate`)。
+    *   受信したメッセージリストの処理は `KafkaConsumerService` に委譲します。
 
 ### 3. Producer (`com.example.kafkasample.producer`)
 *   **KafkaProducer.java**: メッセージ送信のインターフェース定義です。
 *   **KafkaProducerImpl.java**: `KafkaProducer` の実装クラスです。
-    *   `KafkaTemplate` を使用して、Avro形式の `User` オブジェクトを "user" トピックに送信します。
+    *   `KafkaTemplate` を使用して、Avro形式の `User` オブジェクトを "user" トピックに送信します。非同期送信を行い、`CompletableFuture` を返します。
 
 ### 4. Service (`com.example.kafkasample.service`)
 *   **KafkaProducerService.java**: メッセージ送信を管理するサービスのインターフェースです。
 *   **KafkaProducerServiceImpl.java**: `KafkaProducerService` の実装クラスです。
-    *   `@Scheduled(fixedRate = 100)`: 100ミリ秒ごとに定期的に実行されます。
-    *   ランダムなデータ（UUIDのName、ランダムな色、数値）を持つ `User` オブジェクトを生成し、`KafkaProducer` を通じて送信します。
+    *   `@Scheduled(fixedRate = 10)`: 10ミリ秒ごとに定期的に実行されます。
+    *   1回の実行につき20件のメッセージを生成し、`KafkaProducer` を通じて並列送信します。全ての送信完了 (`CompletableFuture.allOf`) を待機します。
+    *   ランダムなデータ（UUIDのName、ランダムな色、数値）を持つ `User` オブジェクトを生成します。
     *   起動から10分経過すると送信を停止するロジックが含まれています。
 *   **KafkaConsumerService.java**: メッセージ受信処理を管理するサービスのインターフェースです。
 *   **KafkaConsumerServiceImpl.java**: `KafkaConsumerService` の実装クラスです。
-    *   `KafkaConsumerImpl` から受け取った `User` オブジェクトのリストを処理（ログ出力、DB保存など）します。
+    *   `KafkaConsumerImpl` から受け取った `User` オブジェクトのリストをループ処理し、`UserRepository` を通じてデータベース（H2）に保存します。
 
-### 5. Config (`src/main/resources/`)
-*   **application.properties**: Kafkaブローカーのアドレス (`spring.kafka.bootstrap-servers`)、Schema RegistryのURL (`spring.kafka.properties.schema.registry.url`)、シリアライザー・デシリアライザーの設定などが記述されています。
+### 5. Repository (`com.example.kafkasample.repository`)
+*   **UserRepository.java**: データベース操作を行うリポジトリクラスです。MyBatisのMapperを利用してデータの永続化を行います。
+
+### 6. Config (`src/main/resources/`)
+*   **application.properties**:
+    *   **Kafka**: ブローカーアドレス、Schema Registry URL、シリアライザー設定、バッチリスナー設定 (`batch`, `manual_immediate`) など。
+    *   **Database**: H2 Database (In-Memory) の接続設定。
+    *   **MyBatis**: マッピング設定など。
