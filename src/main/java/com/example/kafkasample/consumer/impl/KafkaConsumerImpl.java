@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import com.example.kafkasample.avro.User;
 import com.example.kafkasample.consumer.KafkaConsumer;
 import com.example.kafkasample.service.KafkaConsumerService;
+import org.springframework.kafka.support.Acknowledgment;
 
 @Component
 public class KafkaConsumerImpl implements KafkaConsumer {
@@ -23,8 +24,9 @@ public class KafkaConsumerImpl implements KafkaConsumer {
     }
 
     @KafkaListener(topics = "user", groupId = "order-processing-group")
-    public void consume(List<User> users) {
+    public void consume(List<User> users, Acknowledgment acknowledgment) {
         log.info("バッチ受信しました: {} 件", users.size());
         kafkaConsumerService.process(users);
+        acknowledgment.acknowledge();
     }
 }
