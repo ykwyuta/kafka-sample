@@ -9,6 +9,10 @@ import java.time.Instant;
 import java.util.UUID;
 import java.util.random.RandomGenerator;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import org.springframework.kafka.support.SendResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -34,12 +38,18 @@ public class KafkaProducerServiceImpl implements KafkaProducerService {
             log.info("送信終了");
             return;
         }
-        User user = User.newBuilder()
-                .setName(UUID.randomUUID().toString().replace("-", ""))
-                .setFavoriteColor(generateRandomHexColor())
-                .setFavoriteNumber((int) (Math.random() * 100))
-                .build();
-        kafkaProducer.sendMessage(user);
+
+        List<CompletableFuture<SendResult<String, User>>> futures = new ArrayList<>();
+        for (int i = 0; i < 20; i++) {
+            User user = User.newBuilder()
+                    .setName(UUID.randomUUID().toString().replace("-", ""))
+                    .setFavoriteColor(generateRandomHexColor())
+                    .setFavoriteNumber((int) (Math.random() * 100))
+                    .build();
+            futures.add(kafkaProducer.sendMessage(user));
+        }
+
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
     }
 
     public String generateRandomHexColor() {

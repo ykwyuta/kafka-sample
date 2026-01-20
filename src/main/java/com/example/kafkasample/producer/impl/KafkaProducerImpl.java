@@ -3,6 +3,8 @@ package com.example.kafkasample.producer.impl;
 import com.example.kafkasample.avro.User;
 import com.example.kafkasample.producer.KafkaProducer;
 
+import java.util.concurrent.CompletableFuture;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
@@ -16,7 +18,7 @@ public class KafkaProducerImpl implements KafkaProducer {
     }
 
     @Override
-    public void sendMessage(User user) {
-        kafkaTemplate.send("user", user.getName(), user);
+    public CompletableFuture<SendResult<String, User>> sendMessage(User user) {
+        return kafkaTemplate.send("user", user.getName(), user);
     }
 }
