@@ -24,16 +24,19 @@ d:\workspace\kafkasample\
 │   │   │       │   └── impl\
 │   │   │       │       └── KafkaProducerImpl.java # プロデューサーの実装 (送信ロジック)
 │   │   │       ├── service\
-│   │   │       │   ├── KafkaConsumerService.java
-│   │   │       │   ├── KafkaProducerService.java
+│   │   │       │   ├── KafkaConsumerService.java # 受信データ処理サービスのインターフェース
+│   │   │       │   ├── KafkaProducerService.java # メッセージ送信サービスのインターフェース
 │   │   │       │   └── impl\
 │   │   │       │       ├── KafkaConsumerServiceImpl.java # 受信データ処理（DB保存など）
 │   │   │       │       └── KafkaProducerServiceImpl.java # 定期実行される送信サービス
 │   │   │       ├── repository\
-│   │   │       │   ├── UserMapper.java        # MyBatis Mapper
-│   │   │       │   └── UserRepository.java    # データアクセスリポジトリ
+│   │   │       │   ├── impl\
+│   │   │       │   │   └── UserRepositoryImpl.java # データアクセスリポジトリの実装
+│   │   │       │   ├── UserMapper.java        # MyBatis Mapperインターフェース
+│   │   │       │   └── UserRepository.java    # データアクセスリポジトリのインターフェース
 │   │   └── resources\
-│   │       └── application.properties         # Kafka接続設定、DB設定など
+│   │       ├── application.properties         # Kafka接続設定、DB設定など
+│   │       └── schema.sql                     # データベース初期化SQL (テーブル作成)
 ├── pom.xml                                    # Maven依存関係定義 (Avro, Kafka, MyBatis, H2)
 ├── docker-compose.yml                         # Kafka環境などのコンテナ構成定義
 └── HELP.md                                    # Spring Boot生成時のヘルプ
@@ -68,10 +71,13 @@ d:\workspace\kafkasample\
     *   `KafkaConsumerImpl` から受け取った `User` オブジェクトのリストをループ処理し、`UserRepository` を通じてデータベース（H2）に保存します。
 
 ### 5. Repository (`com.example.kafkasample.repository`)
-*   **UserRepository.java**: データベース操作を行うリポジトリクラスです。MyBatisのMapperを利用してデータの永続化を行います。
+*   **UserRepository.java**: データアクセス抽象化のためのリポジトリインターフェースです。
+*   **impl/UserRepositoryImpl.java**: `UserRepository` の実装クラスです。`UserMapper` を使用して実際のデータベース操作を行います。
+*   **UserMapper.java**: MyBatisのMapperインターフェースです。SQLアノテーション（`@Insert`）を使用して `users` テーブルへのデータ保存を定義しています。
 
 ### 6. Config (`src/main/resources/`)
 *   **application.properties**:
     *   **Kafka**: ブローカーアドレス、Schema Registry URL、シリアライザー設定、バッチリスナー設定 (`batch`, `manual_immediate`) など。
     *   **Database**: H2 Database (In-Memory) の接続設定。
     *   **MyBatis**: マッピング設定など。
+*   **schema.sql**: アプリケーション起動時に実行されるSQLスクリプトです。`users` テーブルが存在しない場合に作成します。
